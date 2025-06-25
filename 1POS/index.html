@@ -2111,22 +2111,47 @@
             renderReceiptsHistory();
             console.log("Receipt added to history and saved.");
 
-     if (printReceipt) {
+        }
+
+if (printReceipt) {
     console.log("Attempting to print receipt...");
     receiptPrintArea.innerHTML = generateReceiptHtml(receiptData, true);
 
+    // Generate main transaction barcode
     const transactionBarcodeElement = receiptPrintArea.querySelector('#receipt-transaction-barcode');
     if (transactionBarcodeElement) {
         try {
-            JsBarcode(transactionBarcodeElement, transactionId, { format: "CODE128", displayValue: true, width: 1.5, height: 50, margin: 5, fontSize: 12, lineColor: "#000", background: "#fff" });
+            JsBarcode(transactionBarcodeElement, transactionId, {
+                format: "CODE128", displayValue: true, width: 1.5, height: 50,
+                margin: 5, fontSize: 12, lineColor: "#000", background: "#fff"
+            });
             console.log("Transaction barcode generated for print area.");
         } catch (e) {
-            console.error(`Error generating transaction barcode (${transactionId}) for print:`, e);
+            console.error(`Error generating transaction barcode:`, e);
             transactionBarcodeElement.textContent = `Code: ${transactionId}`;
         }
     }
 
-    // Send receipt HTML to backend for printing
+    // Generate recommended barcodes
+    if (receiptData.recommendedDiscounts && receiptData.recommendedDiscounts.length > 0) {
+        receiptData.recommendedDiscounts.forEach((coupon) => {
+            const recBarcodeElement = receiptPrintArea.querySelector(`#rec-barcode-${coupon.code}`);
+            if (recBarcodeElement) {
+                try {
+                    JsBarcode(recBarcodeElement, coupon.code, {
+                        format: "CODE128", displayValue: true, width: 1.5, height: 50,
+                        margin: 5, fontSize: 12, lineColor: "#000", background: "#fff"
+                    });
+                    console.log(`Recommended barcode ${coupon.code} generated for print area.`);
+                } catch (e) {
+                    console.error(`Error generating recommendation barcode for ${coupon.code}:`, e);
+                    recBarcodeElement.textContent = `Code: ${coupon.code}`;
+                }
+            }
+        });
+    }
+
+    // ✅ Only now — after all barcode SVGs are rendered — send the HTML to backend
     fetch('http://localhost:3000/print-receipt', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -2140,44 +2165,10 @@
         console.error("Error sending receipt to backend:", err);
     });
 
-    // Optionally hide or clear receiptPrintArea here if you want
+    // Clear out the print area
+    receiptPrintArea.innerHTML = '';
 }
 
-
-                if (receiptData.recommendedDiscounts && receiptData.recommendedDiscounts.length > 0) {
-                    receiptData.recommendedDiscounts.forEach((coupon) => {
-                        const recBarcodeElement = receiptPrintArea.querySelector(`#rec-barcode-${coupon.code}`);
-                        if (recBarcodeElement) {
-                            try {
-                                JsBarcode(recBarcodeElement, coupon.code, { format: "CODE128", displayValue: true, width: 1.5, height: 50, margin: 5, fontSize: 12, lineColor: "#000", background: "#fff" });
-                                console.log(`Recommended barcode ${coupon.code} generated for print area.`);
-                            } catch (e) {
-                                console.error(`Error generating recommendation barcode for ${coupon.code} for print:`, e);
-                                recBarcodeElement.textContent = `Code: ${coupon.code}`;
-                            }
-                        }
-                    });
-                }
-
-                receiptPrintArea.classList.remove('hidden'); // Make the print area visible
-                console.log("receiptPrintArea visibility set to true, calling window.print()...");
-                window.print(); // Trigger the browser's print dialog
-                console.log("window.print() called.");
-                receiptPrintArea.classList.add('hidden'); // Hide the print area again
-                receiptPrintArea.innerHTML = ''; // Clear the print area content
-            } else {
-                console.log("Receipt not requested to be printed.");
-            }
-
-            // Reset for next transaction
-            cart = [];
-            appliedCoupon = null;
-            currentCustomer = null;
-            bagsUsed = 0; // Explicitly reset bagsUsed
-            updateCartDisplay(); // Clear display
-            barcodeScannerInput.focus();
-            console.log("Cart cleared, state reset, and focus returned to barcode input. finalizeSale finished.");
-        }
 
         /**
          * Gets a random selection of recommended coupons.
